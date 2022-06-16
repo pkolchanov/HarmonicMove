@@ -18,6 +18,10 @@ from scipy.optimize import fsolve
 from GlyphsApp import *
 from GlyphsApp.plugins import *
 
+def getIntersection( x1,y1, x2,y2, x3,y3, x4,y4 ):
+	px = ( (x1*y2-y1*x2)*(x3-x4)-(x1-x2)*(x3*y4-y3*x4) ) / ( (x1-x2)*(y3-y4)-(y1-y2)*(x3-x4) ) 
+	py = ( (x1*y2-y1*x2)*(y3-y4)-(y1-y2)*(x3*y4-y3*x4) ) / ( (x1-x2)*(y3-y4)-(y1-y2)*(x3-x4) )
+	return px, py
 
 def derivative(p0,p1,p2,p3,t):
 	return 3*((1-t)**2)*(p1-p0) +6*(1-t)*t*(p2-p1) + 3*(t**2)*(p3-p2)
@@ -65,18 +69,54 @@ class ____PluginClassName____(SelectTool):
 	def activate(self):
 		pass
 	
-	# @objc.python_method
-	# def background(self, layer):
+	@objc.python_method
+	def background(self, layer):
+		if len(layer.selection) != 1:
+			return
 
-	# 	# Draw a red rectangle behind the glyph as big as the glyph’s bounding box
-	# 	NSColor.redColor().set()
-	# 	NSBezierPath.fillRect_(layer.bounds)
+		for shape in layer.shapes:
+			if not shape.nodes:
+				continue
+			for node in shape.nodes:
+				
+				if node in layer.selection:
+
+					N = node.nextNode
+					NN = node.nextNode.nextNode
+					P = node.prevNode
+					PP = node.prevNode.prevNode
+
+					if node.type == 'offcurve' and N.type =='offcurve' :
+						xIntersect, yIntersect = (
+										getIntersection( 
+											node.x, node.y, P.x, P.y,
+											N.x, N.y, NN.x, NN.y,
+											) 
+										)
+						intersection = NSPoint( xIntersect, yIntersect )
+					if  node.type == 'offcurve' and P.type =='offcurve': 
+						xIntersect, yIntersect = (
+										getIntersection( 
+											node.x, node.y, N.x, N.y,
+											P.x, P.y, PP.x, PP.y,
+											) 
+										)
+						intersection = NSPoint( xIntersect, yIntersect )
+					
+					if intersection:
+						handleSize = 5
+						print(intersection)
+						rect = NSRect()
+						rect.origin = NSPoint(intersection.x-handleSize/2, intersection.y-handleSize/2)
+						rect.size = NSSize(handleSize, handleSize)
+						NSBezierPath.bezierPathWithOvalInRect_(rect).fill()
+
+					
 
 	@objc.python_method
 	def deactivate(self):
 		pass
 	
-
 
 	def moveSelectionWithPoint_withModifier_(self, delta,modidierKeys):
 		print(delta, modidierKeys, self.draggStart(), self.dragging())
@@ -84,13 +124,12 @@ class ____PluginClassName____(SelectTool):
 		isDragging = self.dragging()
 		#objc.super(____PluginClassName____, self).moveSelectionWithPoint_withModifier_(delta, modidierKeys)
 		layer = self.editViewController().graphicView().activeLayer()
+		if len(layer.selection) != 1:
+			return
 		for shape in layer.shapes:
 			if not shape.nodes:
 				continue
 			for node in shape.nodes:
-				if len(layer.selection) != 1:
-					break
-
 				if node in layer.selection:
 				
 
@@ -146,6 +185,22 @@ class ____PluginClassName____(SelectTool):
 							P.position = NSPoint(new_x_1, z*new_x_1+b)
 							node.position = target_positon
 
+	def printInfo_(self, sender):
+		"""
+		Example for a method triggered by a context menu item.
+		Fill in your own method name and code.
+		Remove this method if you do not want any extra context menu items.
+		"""
+
+		# Execute only if layers are actually selected
+		if Glyphs.font.selectedLayers:
+			layer = Glyphs.font.selectedLayers[0]
+		
+			# Do stuff:
+			print("Current layer:", layer.parent.name, layer.name)
+			print("  Number of paths:", len(layer.paths))
+			print("  Number of components:", len(layer.components))
+			print("  Number of anchors:", len(layer.anchors))
 
 	@objc.python_method
 	def __file__(self):
