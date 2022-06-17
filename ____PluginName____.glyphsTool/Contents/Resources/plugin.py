@@ -29,20 +29,21 @@ def derivative(p0,p1,p2,p3,t):
 def second_derivative(p0,p1,p2,p3,t):
 	return 6*(1-t)*(p2-2*p1+p0)+6*t*(p3-2*p2+p1)
 
-def curvature(x_0,y_0,x_1,y_1,x_2,y_2,x_3,y_3, t):
-	dx = derivative(x_0, x_1, x_2, x_3, t)
-	ddx = second_derivative(x_0, x_1, x_2, x_3, t)
-	dy = derivative(y_0, y_1, y_2, y_3, t)
-	ddy = second_derivative(y_0, y_1, y_2, y_3, t)
-	return (ddx * dy + ddy * dx) / ((dy ** 2 + dx ** 2) ** 1.5)
+def curvature(x0,y0,x1,y1,x2,y2,x3,y3, t):
+	dx = derivative(x0, x1, x2, x3, t)
+	ddx = second_derivative(x0, x1, x2, x3, t)
+	dy = derivative(y0, y1, y2, y3, t)
+	ddy = second_derivative(y0, y1, y2, y3, t)
+	return (ddx * dy - ddy * dx) / ((dy ** 2 + dx ** 2) ** 1.5)
 
+		
 
-def get_line_params(x_0,y_0,x_1,y_1):
-	if x_0-x_1 != 0:
-		z = (y_0-y_1)/(x_0-x_1)
+def get_line_params(x0,y0,x1,y1):
+	if x0-x1 != 0:
+		z = (y0-y1)/(x0-x1)
 	else :
 		z = 0
-	b = (y_0+y_1 - z*(x_0+x_1))/2
+	b = (y0+y1 - z*(x0+x1))/2
 	return z, b
 
 
@@ -50,6 +51,23 @@ def get_line_params(x_0,y_0,x_1,y_1):
 # fsolve → ?
 # only scale handles?
 # move anyway if cant
+
+def find_selected_node(layer):
+	if len(layer.selection) != 1:
+			return
+	for shape in layer.shapes:
+		if not shape.nodes:
+			continue
+		for node in shape.nodes:
+			if node in layer.selection:
+				return (node, node.nextNode, node.nextNode.nextNode, node.prevNode, node.prevNode.prevNode)
+
+def is_p1(node, N, P):
+	return  node.type == 'offcurve' and N.type =='offcurve'
+
+def is_p2(node, N, P):
+	return node.type == 'offcurve' and P.type =='offcurve'
+
 
 class ____PluginClassName____(SelectTool):
 
@@ -73,43 +91,32 @@ class ____PluginClassName____(SelectTool):
 	def background(self, layer):
 		if len(layer.selection) != 1:
 			return
-
-		for shape in layer.shapes:
-			if not shape.nodes:
-				continue
-			for node in shape.nodes:
-				
-				if node in layer.selection:
-
-					N = node.nextNode
-					NN = node.nextNode.nextNode
-					P = node.prevNode
-					PP = node.prevNode.prevNode
-
-					if node.type == 'offcurve' and N.type =='offcurve' :
-						xIntersect, yIntersect = (
-										getIntersection( 
-											node.x, node.y, P.x, P.y,
-											N.x, N.y, NN.x, NN.y,
-											) 
-										)
-						intersection = NSPoint( xIntersect, yIntersect )
-					if  node.type == 'offcurve' and P.type =='offcurve': 
-						xIntersect, yIntersect = (
-										getIntersection( 
-											node.x, node.y, N.x, N.y,
-											P.x, P.y, PP.x, PP.y,
-											) 
-										)
-						intersection = NSPoint( xIntersect, yIntersect )
-					
-					if intersection:
-						handleSize = 5
-						print(intersection)
-						rect = NSRect()
-						rect.origin = NSPoint(intersection.x-handleSize/2, intersection.y-handleSize/2)
-						rect.size = NSSize(handleSize, handleSize)
-						NSBezierPath.bezierPathWithOvalInRect_(rect).fill()
+		node, N, NN, P, PP = find_selected_node(layer)
+		
+		if is_p1(node, N, P) :
+			xIntersect, yIntersect = (
+							getIntersection( 
+								node.x, node.y, P.x, P.y,
+								N.x, N.y, NN.x, NN.y,
+								) 
+							)
+			intersection = NSPoint( xIntersect, yIntersect )
+		
+		if is_p2(node, N, P): 
+			xIntersect, yIntersect = (
+							getIntersection( 
+								node.x, node.y, N.x, N.y,
+								P.x, P.y, PP.x, PP.y,
+								) 
+							)
+			intersection = NSPoint( xIntersect, yIntersect )
+		
+		if intersection:
+			handleSize = 5
+			rect = NSRect()
+			rect.origin = NSPoint(intersection.x-handleSize/2, intersection.y-handleSize/2)
+			rect.size = NSSize(handleSize, handleSize)
+			NSBezierPath.bezierPathWithOvalInRect_(rect).fill()
 
 					
 
@@ -122,75 +129,78 @@ class ____PluginClassName____(SelectTool):
 		print(delta, modidierKeys, self.draggStart(), self.dragging())
 		draggStart = self.draggStart()
 		isDragging = self.dragging()
-		#objc.super(____PluginClassName____, self).moveSelectionWithPoint_withModifier_(delta, modidierKeys)
+		
 		layer = self.editViewController().graphicView().activeLayer()
 		if len(layer.selection) != 1:
 			return
-		for shape in layer.shapes:
-			if not shape.nodes:
-				continue
-			for node in shape.nodes:
-				if node in layer.selection:
+		node, N, NN, P, PP = find_selected_node(layer)
+
+
+
+		#target_positon = addPoints(draggStart, delta) if isDragging else addPoints(node.position, delta)
+			
+		if is_p1(node, N, P):
+			print ('P1')
+			x0, y0, x1,y1, x2,y2,x3,y3 = P.x, P.y, node.x, node.y, N.x, N.y, NN.x, NN.y
+			
+			# z0, b0 = get_line_params(x0,y0,x1,y1)
+			# target_x = draggStart.x + delta[0] if isDragging else node.position.x + delta[0]
+			# target_y = z0*target_x+b0
+			# target_positon = NSPoint(target_x, target_y)
+
+			
+			initial_k = curvature(x0,y0, x1,y1, x2,y2,x3,y3,0)
+
+
+			if (x2 == x3):
+				def to_solve(to_optimize):
+					return initial_k -curvature(x0,y0,target_positon.x,target_positon.y,x2,to_optimize,x3,y3,0)
 				
+				new_y2 = fsolve(to_solve, N.y)[0]		
 
-					N = node.nextNode
-					NN = node.nextNode.nextNode
-					P = node.prevNode
-					PP = node.prevNode.prevNode
-					target_positon = addPoints(draggStart, delta) if isDragging else addPoints(node.position, delta)
-					
-					if node.type == 'offcurve' and N.type =='offcurve':
-						print ('P1')
-						x_0, y_0, x_1,y_1, x_2,y_2,x_3,y_3 = P.x, P.y, node.x, node.y, N.x, N.y, NN.x, NN.y
-						initial_k = curvature(x_0,y_0, x_1,y_1, x_2,y_2,x_3,y_3, 0)
+				N.position = NSPoint(x2, new_y2)
+				node.position = target_positon
+			else:
+				z, b = get_line_params(x2,y2,x3,y3)
 
-						if (x_2 == x_3):
-							def to_solve(to_optimize):
-								return initial_k -curvature(x_0,y_0,target_positon.x,target_positon.y,x_2,to_optimize,x_3,y_3,0)
-							new_y_2 = fsolve(to_solve, N.y)[0]
-							if new_y_2 == y_2:
-								break
-							N.position = NSPoint(x_2, new_y_2)
-							node.position = target_positon
-						else:
-							z, b = get_line_params(x_2,y_2,x_3,y_3)
-							def to_solve(new_x_2):
-								new_y_2 = z*new_x_2+b
-								return initial_k -curvature(x_0,y_0,target_positon.x,target_positon.y,new_x_2,new_y_2,x_3,y_3,0)
-							new_x_2 = fsolve(to_solve, x_2)[0]
+				def to_solve(new_x2):
+					new_y2 = z*new_x2+b
+					return initial_k -curvature(x0,y0,target_positon.x,target_positon.y,new_x2,new_y2,x3,y3,0)
+				new_x2 = fsolve(to_solve, x2)[0]
+				print('solution', to_solve(new_x2), new_x2)
+				
+				N.position = NSPoint(new_x2, z*new_x2+b)
+				node.position = target_positon
 
-							N.position = NSPoint(new_x_2, z*new_x_2+b)
-							node.position = target_positon
+		elif is_p2(node, N, P):
+			print ('P2' )
+			target_positon = addPoints(draggStart, delta) if isDragging else addPoints(node.position, delta)
+	
+			x0, y0, x1,y1, x2,y2,x3,y3 = PP.x, PP.y, P.x, P.y, node.x, node.y, N.x, N.y
+			initial_k = curvature(x0, y0, x1,y1, x2,y2,x3,y3, 1)
 
-					if node.type == 'offcurve' and P.type =='offcurve':
-						print ('P2' )
-						x_0, y_0, x_1,y_1, x_2,y_2,x_3,y_3 = PP.x, PP.y, P.x, P.y, node.x, node.y, N.x, N.y
-						initial_k = curvature(x_0, y_0, x_1,y_1, x_2,y_2,x_3,y_3, 1)
+		
+			if (x0 == x1):
+				def to_solve(new_y1):
+					return initial_k -curvature(x0,y0,x1, new_y1,target_positon.x,target_positon.y,x3,y3,1)
 
-					
-						if (x_0 == x_1):
-							def to_solve(new_y_1):
-								return initial_k -curvature(x_0,y_0,x_1, new_y_1,target_positon.x,target_positon.y,x_3,y_3,1)
+				new_y1 = fsolve(to_solve, y1)[0]
+				P.position = NSPoint(x1, new_y1)
+				node.position = target_positon
+			else:
+				z, b = get_line_params(x0,y0,x1,y1)
+				def to_solve(new_x1):
+					new_y1 = z*new_x1+b
+					return initial_k -curvature(x0,y0,new_x1,new_y1,target_positon.x,target_positon.y, x3,y3,1)
 
-							new_y_1 = fsolve(to_solve, y_1)[0]
-							P.position = NSPoint(x_1, new_y_1)
-							node.position = target_positon
-						else:
-							z, b = get_line_params(x_0,y_0,x_1,y_1)
-							def to_solve(new_x_1):
-								new_y_1 = z*new_x_1+b
-								return initial_k -curvature(x_0,y_0,new_x_1,new_y_1,target_positon.x,target_positon.y, x_3,y_3,1)
+				new_x1 = fsolve(to_solve, x1)[0]
+				P.position = NSPoint(new_x1, z*new_x1+b)
+				node.position = target_positon
+		else:
+			objc.super(____PluginClassName____, self).moveSelectionWithPoint_withModifier_(delta, modidierKeys)
 
-							new_x_1 = fsolve(to_solve, x_1)[0]
-							P.position = NSPoint(new_x_1, z*new_x_1+b)
-							node.position = target_positon
 
 	def printInfo_(self, sender):
-		"""
-		Example for a method triggered by a context menu item.
-		Fill in your own method name and code.
-		Remove this method if you do not want any extra context menu items.
-		"""
 
 		# Execute only if layers are actually selected
 		if Glyphs.font.selectedLayers:
@@ -198,9 +208,6 @@ class ____PluginClassName____(SelectTool):
 		
 			# Do stuff:
 			print("Current layer:", layer.parent.name, layer.name)
-			print("  Number of paths:", len(layer.paths))
-			print("  Number of components:", len(layer.components))
-			print("  Number of anchors:", len(layer.anchors))
 
 	@objc.python_method
 	def __file__(self):
