@@ -17,6 +17,7 @@ from math import sqrt
 from scipy.optimize import fsolve
 from GlyphsApp import *
 from GlyphsApp.plugins import *
+import math
 
 def getIntersection( x1,y1, x2,y2, x3,y3, x4,y4 ):
 	px = ( (x1*y2-y1*x2)*(x3-x4)-(x1-x2)*(x3*y4-y3*x4) ) / ( (x1-x2)*(y3-y4)-(y1-y2)*(x3-x4) ) 
@@ -36,7 +37,12 @@ def curvature(x0,y0,x1,y1,x2,y2,x3,y3, t):
 	ddy = second_derivative(y0, y1, y2, y3, t)
 	return (ddx * dy - ddy * dx) / ((dy ** 2 + dx ** 2) ** 1.5)
 
-		
+	
+def y2_from_k(x0,y0,x1,y1,x2,_,x3,y3, k):
+	return ( (((x1-x0)**2 +(y1-y0)**2 )**1.5) *k*3/2 + x0*y1 - x1*y0 + x2*y0 -x2*y1 ) / (x0-x1)
+
+def x_2_from_k(x0,y0,x1,y1,_,__,x3,y3, k,z,b):
+	return ( (((x1-x0)**2 +(y1-y0)**2 )**1.5) *k*3/2 -b*x0 +b*x1 +x0*y1-x1*y0 )/(x0*z-x1*z-y0+y1)
 
 def get_line_params(x0,y0,x1,y1):
 	if x0-x1 != 0:
@@ -47,10 +53,6 @@ def get_line_params(x0,y0,x1,y1):
 	return z, b
 
 
-#todos
-# fsolve → ?
-# only scale handles?
-# move anyway if cant
 
 def find_selected_node(layer):
 	if len(layer.selection) != 1:
@@ -112,7 +114,10 @@ class ____PluginClassName____(SelectTool):
 			intersection = NSPoint( xIntersect, yIntersect )
 		
 		if intersection:
-			handleSize = 5
+			handSizeInPoints = 1 + Glyphs.handleSize * 2.5 # (= 5.0 or 7.5 or 10.0)
+			handleSize = handSizeInPoints / Glyphs.font.currentTab.scale
+
+			NSColor.grayColor().set()
 			rect = NSRect()
 			rect.origin = NSPoint(intersection.x-handleSize/2, intersection.y-handleSize/2)
 			rect.size = NSSize(handleSize, handleSize)
@@ -126,12 +131,13 @@ class ____PluginClassName____(SelectTool):
 	
 
 	def moveSelectionWithPoint_withModifier_(self, delta,modidierKeys):
-		print(delta, modidierKeys, self.draggStart(), self.dragging())
+		# print(delta, modidierKeys, self.draggStart(), self.dragging())
 		draggStart = self.draggStart()
 		isDragging = self.dragging()
 		
 		layer = self.editViewController().graphicView().activeLayer()
 		if len(layer.selection) != 1:
+			objc.super(____PluginClassName____, self).moveSelectionWithPoint_withModifier_(delta, modidierKeys)
 			return
 		node, N, NN, P, PP = find_selected_node(layer)
 
@@ -142,60 +148,47 @@ class ____PluginClassName____(SelectTool):
 		if is_p1(node, N, P):
 			print ('P1')
 			x0, y0, x1,y1, x2,y2,x3,y3 = P.x, P.y, node.x, node.y, N.x, N.y, NN.x, NN.y
-			
-			# z0, b0 = get_line_params(x0,y0,x1,y1)
-			# target_x = draggStart.x + delta[0] if isDragging else node.position.x + delta[0]
-			# target_y = z0*target_x+b0
-			# target_positon = NSPoint(target_x, target_y)
+			z0, b0 = get_line_params(x0,y0,x1,y1)
+			target_x = draggStart.x + delta[0] if isDragging else node.position.x + delta[0]
+			target_y = z0*target_x+b0
+			target_positon = NSPoint(target_x, target_y)
 
-			
-			initial_k = curvature(x0,y0, x1,y1, x2,y2,x3,y3,0)
-
-
+			initial_k = curvature(x0,y0,x1,y1,x2,y2,x3,y3,0)
 			if (x2 == x3):
-				def to_solve(to_optimize):
-					return initial_k -curvature(x0,y0,target_positon.x,target_positon.y,x2,to_optimize,x3,y3,0)
-				
-				new_y2 = fsolve(to_solve, N.y)[0]		
-
+				new_y2 = y2_from_k(x0,y0,target_positon.x,target_positon.y,x2,y2,x3,y3,initial_k)
 				N.position = NSPoint(x2, new_y2)
 				node.position = target_positon
 			else:
 				z, b = get_line_params(x2,y2,x3,y3)
-
-				def to_solve(new_x2):
-					new_y2 = z*new_x2+b
-					return initial_k -curvature(x0,y0,target_positon.x,target_positon.y,new_x2,new_y2,x3,y3,0)
-				new_x2 = fsolve(to_solve, x2)[0]
-				print('solution', to_solve(new_x2), new_x2)
+				new_x2 = x_2_from_k(x0,y0,target_positon.x,target_positon.y,x2,y2,x3,y3, initial_k,z,b)
 				
 				N.position = NSPoint(new_x2, z*new_x2+b)
 				node.position = target_positon
 
-		elif is_p2(node, N, P):
-			print ('P2' )
-			target_positon = addPoints(draggStart, delta) if isDragging else addPoints(node.position, delta)
+		# elif is_p2(node, N, P):
+		# 	print ('P2' )
+		# 	target_positon = addPoints(draggStart, delta) if isDragging else addPoints(node.position, delta)
 	
-			x0, y0, x1,y1, x2,y2,x3,y3 = PP.x, PP.y, P.x, P.y, node.x, node.y, N.x, N.y
-			initial_k = curvature(x0, y0, x1,y1, x2,y2,x3,y3, 1)
+		# 	x0, y0, x1,y1, x2,y2,x3,y3 = PP.x, PP.y, P.x, P.y, node.x, node.y, N.x, N.y
+		# 	initial_k = curvature(x0, y0, x1,y1, x2,y2,x3,y3, 1)
 
 		
-			if (x0 == x1):
-				def to_solve(new_y1):
-					return initial_k -curvature(x0,y0,x1, new_y1,target_positon.x,target_positon.y,x3,y3,1)
+		# 	if (x0 == x1):
+		# 		def to_solve(new_y1):
+		# 			return initial_k -curvature(x0,y0,x1, new_y1,target_positon.x,target_positon.y,x3,y3,1)
 
-				new_y1 = fsolve(to_solve, y1)[0]
-				P.position = NSPoint(x1, new_y1)
-				node.position = target_positon
-			else:
-				z, b = get_line_params(x0,y0,x1,y1)
-				def to_solve(new_x1):
-					new_y1 = z*new_x1+b
-					return initial_k -curvature(x0,y0,new_x1,new_y1,target_positon.x,target_positon.y, x3,y3,1)
+		# 		new_y1 = fsolve(to_solve, y1)[0]
+		# 		P.position = NSPoint(x1, new_y1)
+		# 		node.position = target_positon
+		# 	else:
+		# 		z, b = get_line_params(x0,y0,x1,y1)
+		# 		def to_solve(new_x1):
+		# 			new_y1 = z*new_x1+b
+		# 			return initial_k -curvature(x0,y0,new_x1,new_y1,target_positon.x,target_positon.y, x3,y3,1)
 
-				new_x1 = fsolve(to_solve, x1)[0]
-				P.position = NSPoint(new_x1, z*new_x1+b)
-				node.position = target_positon
+		# 		new_x1 = fsolve(to_solve, x1)[0]
+		# 		P.position = NSPoint(new_x1, z*new_x1+b)
+		# 		node.position = target_positon
 		else:
 			objc.super(____PluginClassName____, self).moveSelectionWithPoint_withModifier_(delta, modidierKeys)
 
