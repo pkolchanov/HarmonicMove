@@ -14,7 +14,6 @@
 from __future__ import division, print_function, unicode_literals
 import objc
 from math import sqrt
-from scipy.optimize import fsolve
 from GlyphsApp import *
 from GlyphsApp.plugins import *
 import math
@@ -38,11 +37,17 @@ def curvature(x0,y0,x1,y1,x2,y2,x3,y3, t):
 	return (ddx * dy - ddy * dx) / ((dy ** 2 + dx ** 2) ** 1.5)
 
 	
-def y2_from_k(x0,y0,x1,y1,x2,_,x3,y3, k):
+def y2_from_k(x0,y0,x1,y1,x2,_,x3,y3,k):
 	return ( (((x1-x0)**2 +(y1-y0)**2 )**1.5) *k*3/2 + x0*y1 - x1*y0 + x2*y0 -x2*y1 ) / (x0-x1)
 
 def x_2_from_k(x0,y0,x1,y1,_,__,x3,y3, k,z,b):
 	return ( (((x1-x0)**2 +(y1-y0)**2 )**1.5) *k*3/2 -b*x0 +b*x1 +x0*y1-x1*y0 )/(x0*z-x1*z-y0+y1)
+
+def y1_from_k(x0,y0,x1,_,x2,y2,x3,y3,k):
+	return ( (((x3-x2)**2 + (y3-y2)**2 )**1.5)*3*k/2 + x1*y2-x1*y3+x2*y3-x3*y2)/(x2-x3)
+
+def x1_from_k(x0,y0,_,__,x2,y2,x3,y3,k,z,b):
+	return ( (((x3-x2)**2 + (y3-y2)**2 )**1.5)*3*k/2 -b*x2+b*x3 + x2*y3 -x3*y2)/(x2*z-x3*z-y2+y3)
 
 def get_line_params(x0,y0,x1,y1):
 	if x0-x1 != 0:
@@ -165,30 +170,23 @@ class ____PluginClassName____(SelectTool):
 				N.position = NSPoint(new_x2, z*new_x2+b)
 				node.position = target_positon
 
-		# elif is_p2(node, N, P):
-		# 	print ('P2' )
-		# 	target_positon = addPoints(draggStart, delta) if isDragging else addPoints(node.position, delta)
+		elif is_p2(node, N, P):
+			print ('P2' )
+			target_positon = addPoints(draggStart, delta) if isDragging else addPoints(node.position, delta)
 	
-		# 	x0, y0, x1,y1, x2,y2,x3,y3 = PP.x, PP.y, P.x, P.y, node.x, node.y, N.x, N.y
-		# 	initial_k = curvature(x0, y0, x1,y1, x2,y2,x3,y3, 1)
+			x0, y0, x1,y1, x2,y2,x3,y3 = PP.x, PP.y, P.x, P.y, node.x, node.y, N.x, N.y
+			initial_k = curvature(x0, y0, x1,y1, x2,y2,x3,y3, 1)
 
 		
-		# 	if (x0 == x1):
-		# 		def to_solve(new_y1):
-		# 			return initial_k -curvature(x0,y0,x1, new_y1,target_positon.x,target_positon.y,x3,y3,1)
-
-		# 		new_y1 = fsolve(to_solve, y1)[0]
-		# 		P.position = NSPoint(x1, new_y1)
-		# 		node.position = target_positon
-		# 	else:
-		# 		z, b = get_line_params(x0,y0,x1,y1)
-		# 		def to_solve(new_x1):
-		# 			new_y1 = z*new_x1+b
-		# 			return initial_k -curvature(x0,y0,new_x1,new_y1,target_positon.x,target_positon.y, x3,y3,1)
-
-		# 		new_x1 = fsolve(to_solve, x1)[0]
-		# 		P.position = NSPoint(new_x1, z*new_x1+b)
-		# 		node.position = target_positon
+			if (x0 == x1):
+				new_y1 = y1_from_k(x0,y0,x1,y1,target_positon.x,target_positon.y,x3,y3,initial_k)
+				P.position = NSPoint(x1, new_y1)
+				node.position = target_positon
+			else:
+				z, b = get_line_params(x0,y0,x1,y1)
+				new_x1 = x1_from_k(x0,y0,x1,y1,target_positon.x,target_positon.y, x3,y3,initial_k,z,b)
+				P.position = NSPoint(new_x1, z*new_x1+b)
+				node.position = target_positon
 		else:
 			objc.super(____PluginClassName____, self).moveSelectionWithPoint_withModifier_(delta, modidierKeys)
 
