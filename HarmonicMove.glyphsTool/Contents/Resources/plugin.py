@@ -65,6 +65,20 @@ def is_p2(node, N, P):
 
 
 class HarmonicMove(SelectTool):
+	icon = None
+
+	@classmethod
+	def initialize(cls):
+		bundle = NSBundle.bundleWithIdentifier_('com.pkolchanov.HarmonicMove')
+		HarmonicMove.icon = bundle.imageForResource_('HarmonicMoveToolbar')
+		HarmonicMove.icon.setTemplate_(True)
+		HarmonicMove.icon.setName_('HarmonicMoveToolbar')
+		highlightIcon = bundle.imageForResource_('HarmonicMoveToolbarHighlight')
+		highlightIcon.setTemplate_(True)
+		highlightIcon.setName_('HarmonicMoveToolbarHighlight')
+
+	def toolBarIcon(self):
+		return HarmonicMove.icon
 
 	@objc.python_method
 	def settings(self):
