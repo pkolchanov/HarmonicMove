@@ -70,6 +70,7 @@ class HarmonicMove(SelectTool):
 	def settings(self):
 		self.name = Glyphs.localize({'en': u'Harmonic Move'})
 		self.keyboardShortcut = 'm'
+		self.toolbarPosition = 2
 
 	@objc.python_method
 	def start(self):
