@@ -50,7 +50,10 @@ def get_line_params(x0,y0,x1,y1):
 def find_selected_node(layer):
 	if len(layer.selection) != 1:
 			return
+
 	for shape in layer.shapes:
+		if not hasattr(shape, 'nodes'):
+			continue
 		if not shape.nodes:
 			continue
 		for node in shape.nodes:
