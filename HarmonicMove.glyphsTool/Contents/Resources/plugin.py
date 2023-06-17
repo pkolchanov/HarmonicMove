@@ -2,6 +2,7 @@
 
 from __future__ import division, print_function, unicode_literals
 import objc
+from AppKit import NSBeep
 from math import sqrt
 from GlyphsApp import *
 from GlyphsApp.plugins import *
@@ -152,7 +153,10 @@ class HarmonicMove(SelectTool):
 			z0, b0 = get_line_params(x0,y0,x1,y1)
 
 			initial_k = curvature(x0,y0,x1,y1,x2,y2,x3,y3,0)
-			if (x2 == x3):
+			if x2 == x3:
+				if x0 == target_positon.x:
+					NSBeep()
+					return 
 				new_y2 = y2_from_k(x0,y0,target_positon.x,target_positon.y,x2,y2,x3,y3,initial_k)
 				N.position = NSPoint(x2, new_y2)
 				node.position = target_positon
@@ -169,7 +173,10 @@ class HarmonicMove(SelectTool):
 			x0, y0, x1,y1, x2,y2,x3,y3 = PP.x, PP.y, P.x, P.y, node.x, node.y, N.x, N.y
 			initial_k = curvature(x0, y0, x1,y1, x2,y2,x3,y3, 1)
 
-			if (x0 == x1):
+			if x0 == x1:
+				if target_positon.x == x3:
+					NSBeep()
+					return
 				new_y1 = y1_from_k(x0,y0,x1,y1,target_positon.x,target_positon.y,x3,y3,initial_k)
 				P.position = NSPoint(x1, new_y1)
 				node.position = target_positon
