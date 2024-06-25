@@ -149,6 +149,8 @@ class HarmonicMove(SelectTool):
 		objc.super(HarmonicMove, self).setDragging_(ds)
 		if ds:
 			layer = self.editViewController().graphicView().activeLayer()
+			if len(layer.selection) != 1:
+				return
 			node, N, NN, P, PP = find_selected_node(layer)
 			if is_p1(node, N, P):
 				x0, y0, x1, y1, x2, y2, x3, y3 = P.x, P.y, node.x, node.y, N.x, N.y, NN.x, NN.y
