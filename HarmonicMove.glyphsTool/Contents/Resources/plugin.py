@@ -198,7 +198,7 @@ class HarmonicMove(SelectTool):
 		initial_k = self.initial_dragging_k if isDragging else initial_curvature(node)
 
 		if is_p1(node, N, P):
-			if alt_pressed:
+			if alt_pressed or P.smooth:
 				target_position = projection(P, start, target_position)
 
 			if x2 == x3:
@@ -214,7 +214,7 @@ class HarmonicMove(SelectTool):
 				N.position = NSPoint(new_x2, z*new_x2+b)
 
 		elif is_p2(node, N, P):
-			if alt_pressed:
+			if alt_pressed or N.smooth:
 				target_position = projection(N, start, target_position)
 
 			if x0 == x1:
