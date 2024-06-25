@@ -104,6 +104,12 @@ def initial_curvature(selected_node):
 	else:
 		return None
 
+def projection(A, B, point):
+	t = ((point.x - A.x) * (B.x - A.x) + (point.y - A.y) * (B.y - A.y)) / (pow((B.x - A.x), 2) + pow((B.y - A.y), 2))
+	p_x = A.x + t * (B.x - A.x)
+	p_y = A.y + t * (B.y - A.y)
+	return NSPoint(p_x, p_y)
+
 
 class HarmonicMove(SelectTool):
 	icon = None
@@ -173,6 +179,7 @@ class HarmonicMove(SelectTool):
 
 
 	def moveSelectionWithPoint_withModifier_(self, delta, modidierKeys):
+		alt_pressed = modidierKeys & 1 << 19
 		draggStart = self.draggStart()
 		isDragging = self.dragging()
 
@@ -182,12 +189,18 @@ class HarmonicMove(SelectTool):
 			objc.super(HarmonicMove, self).moveSelectionWithPoint_withModifier_(delta, modidierKeys)
 			return
 
-		target_position = addPoints(draggStart, delta) if isDragging else addPoints(node.position, delta)
 		N, NN, P, PP = unpack_node(node)
+		start = draggStart if isDragging else node.position
+		target_position = addPoints(start, delta)
+
+
 		x0, y0, x1, y1, x2, y2, x3, y3 = unpack_coords(node)
 		initial_k = self.initial_dragging_k if isDragging else initial_curvature(node)
 
 		if is_p1(node, N, P):
+			if alt_pressed:
+				target_position = projection(P, start, target_position)
+
 			if x2 == x3:
 				if x0 == target_position.x:
 					NSBeep()
@@ -201,6 +214,9 @@ class HarmonicMove(SelectTool):
 				N.position = NSPoint(new_x2, z*new_x2+b)
 
 		elif is_p2(node, N, P):
+			if alt_pressed:
+				target_position = projection(N, start, target_position)
+
 			if x0 == x1:
 				if target_position.x == x3:
 					NSBeep()
