@@ -41,7 +41,7 @@ def y1_from_k(x0, y0, x1, _, x2, y2, x3, y3, k):
 	return ((((x3-x2)**2 + (y3-y2)**2 )**1.5)*3*k/2 + x1*y2-x1*y3+x2*y3-x3*y2)/(x2-x3)
 
 
-def x1_from_k(x0,y0,_,__,x2,y2,x3,y3,k,z,b):
+def x1_from_k(x0, y0, _, __, x2, y2, x3, y3, k, z, b):
 	return ((((x3-x2)**2 + (y3-y2)**2 )**1.5)*3*k/2 -b*x2+b*x3 + x2*y3 -x3*y2)/(x2*z-x3*z-y2+y3)
 
 
@@ -82,6 +82,7 @@ def is_p2(node, N, P):
 
 class HarmonicMove(SelectTool):
 	icon = None
+	initial_dragging_k = None
 
 	@classmethod
 	def initialize(cls):
@@ -144,6 +145,20 @@ class HarmonicMove(SelectTool):
 	def deactivate(self):
 		pass
 
+	def setDragging_(self, ds):
+		objc.super(HarmonicMove, self).setDragging_(ds)
+		if ds:
+			layer = self.editViewController().graphicView().activeLayer()
+			node, N, NN, P, PP = find_selected_node(layer)
+			if is_p1(node, N, P):
+				x0, y0, x1, y1, x2, y2, x3, y3 = P.x, P.y, node.x, node.y, N.x, N.y, NN.x, NN.y
+				self.initial_dragging_k = curvature(x0, y0, x1, y1, x2, y2, x3, y3, 0)
+			elif is_p2(node, N, P):
+				x0, y0, x1, y1, x2, y2, x3, y3 = PP.x, PP.y, P.x, P.y, node.x, node.y, N.x, N.y
+				self.initial_dragging_k = curvature(x0, y0, x1, y1, x2, y2, x3, y3, 1)
+			else:
+				self.initial_dragging_k = None
+
 
 	def moveSelectionWithPoint_withModifier_(self, delta, modidierKeys):
 		draggStart = self.draggStart()
@@ -160,7 +175,7 @@ class HarmonicMove(SelectTool):
 		if is_p1(node, N, P):
 			print('P1')
 			x0, y0, x1, y1, x2, y2, x3, y3 = P.x, P.y, node.x, node.y, N.x, N.y, NN.x, NN.y
-			initial_k = curvature(x0, y0, x1, y1, x2, y2, x3, y3,0)
+			initial_k = self.initial_dragging_k if isDragging else curvature(x0, y0, x1, y1, x2, y2, x3, y3, 0)
 
 			if x2 == x3:
 				if x0 == target_position.x:
@@ -170,28 +185,27 @@ class HarmonicMove(SelectTool):
 				N.position = NSPoint(x2, new_y2)
 				node.position = target_position
 			else:
-				z, b = get_line_params(x2,y2,x3,y3)
-				new_x2 = x_2_from_k(x0,y0,target_position.x,target_position.y,x2,y2,x3,y3, initial_k,z,b)
+				z, b = get_line_params(x2, y2, x3, y3)
+				new_x2 = x_2_from_k(x0, y0, target_position.x, target_position.y, x2, y2, x3, y3, initial_k, z, b)
 
 				N.position = NSPoint(new_x2, z*new_x2+b)
 				node.position = target_position
 
 		elif is_p2(node, N, P):
 			print('P2')
-
 			x0, y0, x1, y1, x2, y2, x3, y3 = PP.x, PP.y, P.x, P.y, node.x, node.y, N.x, N.y
-			initial_k = curvature(x0, y0, x1, y1, x2, y2, x3, y3, 1)
+			initial_k = self.initial_dragging_k if isDragging else curvature(x0, y0, x1, y1, x2, y2, x3, y3, 1)
 
 			if x0 == x1:
 				if target_position.x == x3:
 					NSBeep()
 					return
-				new_y1 = y1_from_k(x0,y0,x1,y1,target_position.x,target_position.y,x3,y3,initial_k)
+				new_y1 = y1_from_k(x0, y0, x1, y1, target_position.x, target_position.y, x3, y3, initial_k)
 				P.position = NSPoint(x1, new_y1)
 				node.position = target_position
 			else:
-				z, b = get_line_params(x0,y0,x1,y1)
-				new_x1 = x1_from_k(x0,y0,x1,y1,target_position.x,target_position.y, x3,y3,initial_k,z,b)
+				z, b = get_line_params(x0, y0, x1, y1)
+				new_x1 = x1_from_k(x0, y0, x1, y1, target_position.x, target_position.y, x3, y3, initial_k, z, b)
 				P.position = NSPoint(new_x1, z*new_x1+b)
 				node.position = target_position
 		else:
