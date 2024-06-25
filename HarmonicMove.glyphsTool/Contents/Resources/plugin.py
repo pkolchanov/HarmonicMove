@@ -30,23 +30,23 @@ def curvature(x0, y0, x1, y1, x2, y2, x3, y3, t):
 
 
 def y2_from_k(x0, y0, x1, y1, x2, _, x3, y3, k):
-	return ((((x1-x0)**2 +(y1-y0)**2 )**1.5) *k*3/2 + x0*y1 - x1*y0 + x2*y0 -x2*y1 ) / (x0-x1)
+	return ((((x1-x0)**2 +(y1-y0)**2)**1.5) *k*3/2 + x0*y1 - x1*y0 + x2*y0 -x2*y1) / (x0-x1)
 
 
 def x_2_from_k(x0, y0, x1, y1, _, __, x3, y3, k, z, b):
-	return ((((x1-x0)**2 +(y1-y0)**2 )**1.5) *k*3/2 -b*x0 +b*x1 +x0*y1-x1*y0 )/(x0*z-x1*z-y0+y1)
+	return ((((x1-x0)**2 + (y1-y0)**2)**1.5) *k*3/2 -b*x0 +b*x1 +x0*y1-x1*y0)/(x0*z-x1*z-y0+y1)
 
 
 def y1_from_k(x0, y0, x1, _, x2, y2, x3, y3, k):
-	return ((((x3-x2)**2 + (y3-y2)**2 )**1.5)*3*k/2 + x1*y2-x1*y3+x2*y3-x3*y2)/(x2-x3)
+	return ((((x3-x2)**2 + (y3-y2)**2)**1.5)*3*k/2 + x1*y2-x1*y3+x2*y3-x3*y2)/(x2-x3)
 
 
 def x1_from_k(x0, y0, _, __, x2, y2, x3, y3, k, z, b):
-	return ((((x3-x2)**2 + (y3-y2)**2 )**1.5)*3*k/2 -b*x2+b*x3 + x2*y3 -x3*y2)/(x2*z-x3*z-y2+y3)
+	return ((((x3-x2)**2 + (y3-y2)**2)**1.5)*3*k/2 -b*x2+b*x3 + x2*y3 -x3*y2)/(x2*z-x3*z-y2+y3)
 
 
 def get_line_params(x0, y0, x1, y1):
-	if x0-x1 != 0:
+	if x0 - x1 != 0:
 		z = (y0 - y1)/(x0 - x1)
 	else:
 		z = 0
@@ -54,7 +54,7 @@ def get_line_params(x0, y0, x1, y1):
 	return z, b
 
 
-def find_selected_node(layer):
+def find_selected_offcurve_node(layer):
 	if len(layer.selection) != 1:
 		return
 
@@ -64,13 +64,27 @@ def find_selected_node(layer):
 		if not shape.nodes:
 			continue
 		for node in shape.nodes:
-			if node in layer.selection:
+			if node in layer.selection and node.type == 'offcurve':
 				N = node.nextNode
-				NN = N.nextNode if N else None
 				P = node.prevNode
-				PP = P.prevNode if P else None
-				return node, N, NN, P, PP
+				if is_p1(node, N, P) or is_p2(node, N, P):
+					return node
 
+
+def unpack_node(node):
+	N = node.nextNode
+	NN = N.nextNode if N else None
+	P = node.prevNode
+	PP = P.prevNode if P else None
+	return N, NN, P, PP
+
+
+def unpack_coords(node):
+	N, NN, P, PP = unpack_node(node)
+	if is_p1(node, N, P):
+		return P.x, P.y, node.x, node.y, N.x, N.y, NN.x, NN.y
+	elif is_p2(node, N, P):
+		return PP.x, PP.y, P.x, P.y, node.x, node.y, N.x, N.y
 
 def is_p1(node, N, P):
 	return node.type == 'offcurve' and N.type == 'offcurve'
@@ -78,6 +92,17 @@ def is_p1(node, N, P):
 
 def is_p2(node, N, P):
 	return node.type == 'offcurve' and P.type == 'offcurve'
+
+
+def initial_curvature(selected_node):
+	N, NN, P, PP = unpack_node(selected_node)
+	coords = unpack_coords(selected_node)
+	if is_p1(selected_node, N, P):
+		return curvature(*coords, 0)
+	elif is_p2(selected_node, N, P):
+		return curvature(*coords, 1)
+	else:
+		return None
 
 
 class HarmonicMove(SelectTool):
@@ -113,21 +138,13 @@ class HarmonicMove(SelectTool):
 
 	@objc.python_method
 	def background(self, layer):
-		if len(layer.selection) != 1:
+		node = find_selected_offcurve_node(layer)
+		if not node:
 			return
-		node, N, NN, P, PP = find_selected_node(layer)
 
-		if is_p1(node, N, P):
-			intersection = NSPoint(*get_intersection(
-								node.x, node.y, P.x, P.y,
-								N.x, N.y, NN.x, NN.y,
-								))
-
-		if is_p2(node, N, P):
-			intersection = NSPoint(*get_intersection(
-								node.x, node.y, N.x, N.y,
-								P.x, P.y, PP.x, PP.y,
-								))
+		intersection = NSPoint(*get_intersection(
+			*unpack_coords(node)
+		))
 
 		if intersection:
 			handSizeInPoints = 1 + Glyphs.handleSize * 2.5 #(= 5.0 or 7.5 or 10.0)
@@ -149,17 +166,10 @@ class HarmonicMove(SelectTool):
 		objc.super(HarmonicMove, self).setDragging_(ds)
 		if ds:
 			layer = self.editViewController().graphicView().activeLayer()
-			if len(layer.selection) != 1:
+			node = find_selected_offcurve_node(layer)
+			if not node:
 				return
-			node, N, NN, P, PP = find_selected_node(layer)
-			if is_p1(node, N, P):
-				x0, y0, x1, y1, x2, y2, x3, y3 = P.x, P.y, node.x, node.y, N.x, N.y, NN.x, NN.y
-				self.initial_dragging_k = curvature(x0, y0, x1, y1, x2, y2, x3, y3, 0)
-			elif is_p2(node, N, P):
-				x0, y0, x1, y1, x2, y2, x3, y3 = PP.x, PP.y, P.x, P.y, node.x, node.y, N.x, N.y
-				self.initial_dragging_k = curvature(x0, y0, x1, y1, x2, y2, x3, y3, 1)
-			else:
-				self.initial_dragging_k = None
+			self.initial_dragging_k = initial_curvature(node)
 
 
 	def moveSelectionWithPoint_withModifier_(self, delta, modidierKeys):
@@ -167,51 +177,43 @@ class HarmonicMove(SelectTool):
 		isDragging = self.dragging()
 
 		layer = self.editViewController().graphicView().activeLayer()
-		if len(layer.selection) != 1:
+		node = find_selected_offcurve_node(layer)
+		if not node:
 			objc.super(HarmonicMove, self).moveSelectionWithPoint_withModifier_(delta, modidierKeys)
 			return
-		node, N, NN, P, PP = find_selected_node(layer)
 
 		target_position = addPoints(draggStart, delta) if isDragging else addPoints(node.position, delta)
+		N, NN, P, PP = unpack_node(node)
+		x0, y0, x1, y1, x2, y2, x3, y3 = unpack_coords(node)
+		initial_k = self.initial_dragging_k if isDragging else initial_curvature(node)
 
 		if is_p1(node, N, P):
-			print('P1')
-			x0, y0, x1, y1, x2, y2, x3, y3 = P.x, P.y, node.x, node.y, N.x, N.y, NN.x, NN.y
-			initial_k = self.initial_dragging_k if isDragging else curvature(x0, y0, x1, y1, x2, y2, x3, y3, 0)
-
 			if x2 == x3:
 				if x0 == target_position.x:
 					NSBeep()
 					return 
-				new_y2 = y2_from_k(x0,y0,target_position.x,target_position.y,x2,y2,x3,y3,initial_k)
+				new_y2 = y2_from_k(x0, y0, target_position.x, target_position.y, x2, y2, x3, y3, initial_k)
 				N.position = NSPoint(x2, new_y2)
-				node.position = target_position
 			else:
 				z, b = get_line_params(x2, y2, x3, y3)
 				new_x2 = x_2_from_k(x0, y0, target_position.x, target_position.y, x2, y2, x3, y3, initial_k, z, b)
 
 				N.position = NSPoint(new_x2, z*new_x2+b)
-				node.position = target_position
 
 		elif is_p2(node, N, P):
-			print('P2')
-			x0, y0, x1, y1, x2, y2, x3, y3 = PP.x, PP.y, P.x, P.y, node.x, node.y, N.x, N.y
-			initial_k = self.initial_dragging_k if isDragging else curvature(x0, y0, x1, y1, x2, y2, x3, y3, 1)
-
 			if x0 == x1:
 				if target_position.x == x3:
 					NSBeep()
 					return
 				new_y1 = y1_from_k(x0, y0, x1, y1, target_position.x, target_position.y, x3, y3, initial_k)
 				P.position = NSPoint(x1, new_y1)
-				node.position = target_position
+
 			else:
 				z, b = get_line_params(x0, y0, x1, y1)
 				new_x1 = x1_from_k(x0, y0, x1, y1, target_position.x, target_position.y, x3, y3, initial_k, z, b)
 				P.position = NSPoint(new_x1, z*new_x1+b)
-				node.position = target_position
-		else:
-			objc.super(HarmonicMove, self).moveSelectionWithPoint_withModifier_(delta, modidierKeys)
+
+		node.position = target_position
 
 
 	def printInfo_(self, sender):
