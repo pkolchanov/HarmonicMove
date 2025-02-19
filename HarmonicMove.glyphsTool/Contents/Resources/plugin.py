@@ -113,22 +113,25 @@ def projection(A, B, point):
 	return NSPoint(p_x, p_y)
 
 
+toolbarIcon = None
+
 class HarmonicMove(SelectTool):
 	icon = None
 	initial_dragging_k = None
 
 	@classmethod
 	def initialize(cls):
+		global toolbarIcon
 		bundle = NSBundle.bundleWithIdentifier_('com.pkolchanov.HarmonicMove')
-		HarmonicMove.icon = bundle.imageForResource_('HarmonicMoveToolbar')
-		HarmonicMove.icon.setTemplate_(True)
-		HarmonicMove.icon.setName_('HarmonicMoveToolbar')
+		toolbarIcon = bundle.imageForResource_('HarmonicMoveToolbar')
+		toolbarIcon.setTemplate_(True)
+		toolbarIcon.setName_('HarmonicMoveToolbar')
 		highlightIcon = bundle.imageForResource_('HarmonicMoveToolbarHighlight')
 		highlightIcon.setTemplate_(True)
 		highlightIcon.setName_('HarmonicMoveToolbarHighlight')
 
 	def toolBarIcon(self):
-		return HarmonicMove.icon
+		return toolbarIcon
 
 	@objc.python_method
 	def settings(self):
