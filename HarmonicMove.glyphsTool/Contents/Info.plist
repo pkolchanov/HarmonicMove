@@ -13,9 +13,9 @@
 	<key>CFBundleName</key>
 	<string>Harmonic Move</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.1</string> <!-- 1.0 -->
+	<string>1.2</string> <!-- 1.0 -->
 	<key>CFBundleVersion</key>
-	<string>1.1.0</string> <!-- 123 -->
+	<string>12</string> <!-- 123 -->
 	<key>UpdateFeedURL</key>
 	<string>https://raw.githubusercontent.com/pkolchanov/HarmonicMove/master/HarmonicMove.glyphsTool/Contents/Info.plist</string>
 	<key>productPageURL</key>
