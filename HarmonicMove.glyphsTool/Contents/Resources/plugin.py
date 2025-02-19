@@ -2,7 +2,7 @@
 
 from __future__ import division, print_function, unicode_literals
 import objc
-from AppKit import NSBeep, NSBundle, NSColor, NSBezierPath, NSPoint, NSRect, NSSize
+from AppKit import NSBeep, NSBundle, NSColor, NSBezierPath, NSPoint, NSRect
 from GlyphsApp import Glyphs, addPoints
 from GlyphsApp.plugins import SelectTool
 
@@ -162,9 +162,12 @@ class HarmonicMove(SelectTool):
 			handleSize = handSizeInPoints / Glyphs.font.currentTab.scale
 
 			NSColor.redColor().set()
-			rect = NSRect()
-			rect.origin = NSPoint(intersection.x - handleSize / 2, intersection.y - handleSize / 2)
-			rect.size = NSSize(handleSize, handleSize)
+			rect = NSRect(
+				intersection.x - handleSize / 2,
+				intersection.y - handleSize / 2,
+				handleSize,
+				handleSize
+			)
 			NSBezierPath.bezierPathWithOvalInRect_(rect).fill()
 
 
