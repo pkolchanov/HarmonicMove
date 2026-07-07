@@ -188,7 +188,7 @@ class HarmonicMove(SelectTool):
 
 	def moveSelectionWithPoint_withModifier_(self, delta, modidierKeys):
 		alt_pressed = modidierKeys & 1 << 19
-		draggStart = self.draggStart()
+		draggStart = self.draggStart() if hasattr(self, 'draggStart') else self.dragStart() # Glyphs 4
 		isDragging = self.dragging()
 
 		layer = self.editViewController().graphicView().activeLayer()
