@@ -217,6 +217,11 @@ class HarmonicMove(SelectTool):
 				N.position = NSPoint(x2, new_y2)
 			else:
 				z, b = get_line_params(x2, y2, x3, y3)
+				# parallel handles
+				denom = x0 * z - target_position.x * z - y0 + target_position.y
+				if denom == 0:
+					NSBeep()
+					return
 				new_x2 = x_2_from_k(x0, y0, target_position.x, target_position.y, x2, y2, x3, y3, initial_k, z, b)
 
 				N.position = NSPoint(new_x2, z * new_x2 + b)
@@ -234,6 +239,10 @@ class HarmonicMove(SelectTool):
 
 			else:
 				z, b = get_line_params(x0, y0, x1, y1)
+				denom = target_position.x * z - x3 * z - target_position.y + y3
+				if denom == 0:
+					NSBeep()
+					return
 				new_x1 = x1_from_k(x0, y0, x1, y1, target_position.x, target_position.y, x3, y3, initial_k, z, b)
 				P.position = NSPoint(new_x1, z * new_x1 + b)
 
